@@ -1,213 +1,196 @@
-# HTTP Load Balancer
+# Cloud Security Fundamentals Challenge Lab
 
-## Steps
-1. **Instance Template Creation**
-   - Create a regional instance template with desired machine type and startup script
-   - Configure network settings and instance tags
+## Overview
+This challenge lab tests your ability to implement security best practices in Google Cloud Platform (GCP). You'll create a secure Kubernetes Engine cluster with proper IAM roles and service accounts.
 
-2. **Managed Instance Group (MIG) Setup**
-   - Create a regional MIG using the instance template
-   - Set initial size and base instance name
-   - Configure named ports for HTTP traffic
+## Prerequisites
+- Google Cloud SDK installed and configured
+- Access to a GCP project with necessary permissions
+- Basic knowledge of Kubernetes and GCP services
 
-3. **Network Security Configuration**
-   - Create firewall rules to allow HTTP traffic (port 80)
-   - Apply rules to instances with specific tags
-
-4. **Health Check Configuration**
-   - Create HTTP health check to monitor instance health
-   - Configure port and other health check parameters
-
-5. **Backend Service Setup**
-   - Create global backend service
-   - Configure protocol and health checks
-   - Add MIG as backend with load balancing settings
-
-6. **Load Balancer Components**
-   - Create URL map for routing rules
-   - Set up target HTTP proxy
-   - Reserve static IP address
-   - Create global forwarding rule
-
-7. **Verification and Testing**
-   - Wait for instances to be healthy
-   - Test load balancer access
-   - Monitor instance group and load balancer status
-
-## Sample
+## Configuration Values
+Before starting, you need to set these values:
 
 ```bash
-#!/bin/bash
+# Basic GCP Configuration
+PROJECT_ID="$GOOGLE_CLOUD_PROJECT"  # Your GCP project ID
+ZONE="us-central1-c"               # e.g., us-central1-a
+REGION="us-central1"               # e.g., us-central1
 
-# Exit immediately if a command exits with a non-zero status.
-set -e
+# Set default compute zone and region
+gcloud config set compute/zone $ZONE
+gcloud config set compute/region $REGION
 
-# --- Configuration ---
-# Default region based on user requirement
-REGION="us-west3"
-NETWORK="default"
-# Specific firewall rule name from the original challenge description
-# Ensure this name matches the exact requirement of your lab/task
-FIREWALL_RULE_NAME="allow-tcp-rule-852"
-# Specified machine type requirement for the template
-MACHINE_TYPE="e2-medium"
-# Tag for firewall rule targeting
-INSTANCE_TAG="http-server"
-# For naming convention
-TEAM="dodo"
+# Challenge-specific Configuration
+CUSTOM_ROLE_NAME="orca_storage_editor_448"        # Name of the custom security role
+SERVICE_ACCOUNT_NAME="orca-private-cluster-442-sa" # Name of the service account
+CLUSTER_NAME="orca-cluster-282"                   # Name of the GKE cluster
+SUBNET_NAME="orca-build-subnet"                   # Name of the subnet for the cluster
+JUMPHOST_NAME="orca-jumphost"                     # Name of the jumphost instance
+```
 
-# Resource Names 
-TEMPLATE_NAME="$TEAM-web-template"
-MIG_NAME="$TEAM-web-mig" # Regional MIG
-MIG_BASE_INSTANCE_NAME="$TEAM-web-vm"
-HEALTH_CHECK_NAME="$TEAM-http-hc"
-BACKEND_SERVICE_NAME="$TEAM-web-backend" # Global Backend Service
-URL_MAP_NAME="$TEAM-lb-map"
-TARGET_PROXY_NAME="$TEAM-http-proxy"
-STATIC_IP_NAME="$TEAM-lb-ip"
-FORWARDING_RULE_NAME="$TEAM-http-fw-rule"
+## Challenge Tasks
 
+### Task 1: Create a Custom Security Role
+Create a custom IAM role named `$CUSTOM_ROLE_NAME` with the following permissions:
+- storage.buckets.get
+- storage.objects.get
+- storage.objects.list
+- storage.objects.update
+- storage.objects.create
 
-echo "NOTE: Creating a Regional template and MIG in $REGION."
+```bash
+gcloud iam roles create $CUSTOM_ROLE_NAME \
+    --project=$PROJECT_ID \
+    --permissions=storage.buckets.get,storage.objects.get,storage.objects.list,storage.objects.update,storage.objects.create \
+    --title="Orca Storage Role"
+```
 
-# 1. Create the Startup Script Locally
-# This script configures Nginx on the instances
-echo "Creating startup script (startup.sh)..."
-cat << EOF > startup.sh
-#! /bin/bash
-# Updates package lists and installs nginx
-apt-get update
-apt-get install -y nginx
-# Starts nginx service
-service nginx start
-# Modifies the default nginx page to include the VM's hostname
-sed -i -- 's/nginx/Google Cloud Platform - '"\$HOSTNAME"'/' /var/www/html/index.nginx-debian.html
-EOF
-echo "Startup script created."
-echo ""
+### Task 2: Create a Service Account
+Create a service account named `$SERVICE_ACCOUNT_NAME` that will be used by the GKE cluster:
 
-# 2. Create the Regional Instance Template
-# Defines the configuration for VMs in the MIG. Created in the specified region.
-echo "Creating REGIONAL instance template ($TEMPLATE_NAME) in $REGION on network '$NETWORK' with machine type $MACHINE_TYPE..."
-gcloud compute instance-templates create $TEMPLATE_NAME \
+```bash
+gcloud iam service-accounts create $SERVICE_ACCOUNT_NAME \
+    --display-name="Orca Cluster Service Account"
+```
+
+### Task 3: Bind Roles to Service Account
+Bind the following roles to the service account:
+- Built-in roles:
+  - roles/monitoring.viewer
+  - roles/monitoring.metricWriter
+  - roles/logging.logWriter
+- Custom role: $CUSTOM_ROLE_NAME
+
+```bash
+# Bind built-in roles
+for role in "roles/monitoring.viewer" "roles/monitoring.metricWriter" "roles/logging.logWriter"; do
+    gcloud projects add-iam-policy-binding $PROJECT_ID \
+        --member="serviceAccount:$SERVICE_ACCOUNT_NAME@$PROJECT_ID.iam.gserviceaccount.com" \
+        --role="$role"
+done
+
+# Bind custom role
+gcloud projects add-iam-policy-binding $PROJECT_ID \
+    --member="serviceAccount:$SERVICE_ACCOUNT_NAME@$PROJECT_ID.iam.gserviceaccount.com" \
+    --role="projects/$PROJECT_ID/roles/$CUSTOM_ROLE_NAME"
+```
+
+### Task 4: Create Subnet and Jumphost
+First, create a subnet for the cluster:
+
+```bash
+gcloud compute networks subnets create $SUBNET_NAME \
+    --network=default \
+    --enable-private-ip-google-access \
+    --range=10.0.0.0/24 \
     --region=$REGION \
-    --network=$NETWORK \
-    --machine-type=$MACHINE_TYPE \
-    --metadata-from-file=startup-script=startup.sh \
-    --tags=$INSTANCE_TAG
-echo "Regional instance template created in $REGION."
-echo ""
+    --secondary-range=my-svc-range=10.0.32.0/20,my-pod-range=10.4.0.0/14
+```
 
-# 3. Create the Regional Managed Instance Group (MIG)
-# Manages a group of identical VMs based on the regional template.
-echo "Creating REGIONAL managed instance group ($MIG_NAME) in $REGION..."
-gcloud compute instance-groups managed create $MIG_NAME \
-    --base-instance-name=$MIG_BASE_INSTANCE_NAME \
-    --size=2 \
-    --template=$TEMPLATE_NAME \
-    --region=$REGION
-echo "Regional managed instance group created in $REGION."
-echo ""
+Then create a jumphost instance:
 
-# 4. Create the Firewall Rule
-# Allows incoming HTTP traffic to instances with the correct tag
-# Firewall rules apply per-network.
-echo "Creating firewall rule ($FIREWALL_RULE_NAME) on network '$NETWORK' to allow TCP port 80..."
-gcloud compute firewall-rules create $FIREWALL_RULE_NAME \
-    --network=$NETWORK \
-    --allow=tcp:80 \
-    --source-ranges=0.0.0.0/0 \
-    --target-tags=$INSTANCE_TAG
-echo "Firewall rule created."
-echo ""
+```bash
+gcloud compute instances create $JUMPHOST_NAME \
+    --zone=$ZONE \
+    --scopes="https://www.googleapis.com/auth/cloud-platform"
+```
 
-# 5. Create the Health Check (Global)
-# Used by the load balancer to check if instances are healthy
-echo "Creating HTTP health check ($HEALTH_CHECK_NAME)..."
-gcloud compute http-health-checks create $HEALTH_CHECK_NAME \
-    --port=80
-echo "Health check created."
-echo ""
+### Task 5: Create Private GKE Cluster
+Create a private GKE cluster with the following specifications:
+- Name: $CLUSTER_NAME
+- Subnet: $SUBNET_NAME
+- Private nodes enabled
+- Private endpoint enabled
+- IP alias enabled
+- Master authorized networks: $JUMPHOST_NAME internal IP
 
-# 6. Set Named Ports on the Regional MIG
-# Associates a name (http) with a port number (80) for the MIG
-echo "Setting named port 'http:80' on Regional MIG ($MIG_NAME) in $REGION..."
-gcloud compute instance-groups managed set-named-ports $MIG_NAME \
-    --named-ports=http:80 \
-    --region=$REGION
-echo "Named port set."
-echo ""
+```bash
+# Get jumphost IP
+JUMPHOST_INTERNAL_IP=$(gcloud compute instances describe $JUMPHOST_NAME \
+    --zone=$ZONE \
+    --format='get(networkInterfaces[0].networkIP)')
 
-# 7. Create the Backend Service (Global)
-# Defines how the load balancer distributes traffic to backends
-echo "Creating global backend service ($BACKEND_SERVICE_NAME)..."
-gcloud compute backend-services create $BACKEND_SERVICE_NAME \
-    --protocol=HTTP \
-    --port-name=http \
-    --http-health-checks=$HEALTH_CHECK_NAME \
-    --global
-echo "Backend service created."
-echo ""
+# Create cluster
+gcloud beta container clusters create $CLUSTER_NAME \
+    --zone=$ZONE \
+    --subnetwork=$SUBNET_NAME \
+    --master-ipv4-cidr 172.16.0.32/28 \
+    --enable-private-nodes \
+    --enable-private-endpoint \
+    --enable-ip-alias \
+    --enable-master-authorized-networks \
+    --master-authorized-networks=$JUMPHOST_INTERNAL_IP/32
+```
 
-# 8. Add the Regional Instance Group to the Backend Service
-# Links the MIG to the backend service
-echo "Adding Regional MIG ($MIG_NAME) from $REGION to global backend service ($BACKEND_SERVICE_NAME)..."
-gcloud compute backend-services add-backend $BACKEND_SERVICE_NAME \
-    --instance-group=$MIG_NAME \
-    --instance-group-region=$REGION \
-    --balancing-mode=UTILIZATION \
-    --max-utilization=0.8 \
-    --global
-echo "Instance group added to backend service."
-echo ""
+### Task 6: Deploy Application via Jumphost
+Deploy a test application through the jumphost:
 
-# 9. Create the URL Map (Global)
-# Defines routing rules for incoming requests
-echo "Creating URL map ($URL_MAP_NAME)..."
-gcloud compute url-maps create $URL_MAP_NAME \
-    --default-service=$BACKEND_SERVICE_NAME
-echo "URL map created."
-echo ""
+```bash
+# SSH into jumphost and run deployment commands
+gcloud compute ssh $JUMPHOST_NAME --zone=$ZONE --command="
+    # Install GKE auth plugin
+    sudo apt-get update && sudo apt-get install -y google-cloud-sdk-gke-gcloud-auth-plugin
 
-# 10. Create the Target HTTP Proxy (Global)
-# Receives requests and uses the URL map to route them
-echo "Creating target HTTP proxy ($TARGET_PROXY_NAME)..."
-gcloud compute target-http-proxies create $TARGET_PROXY_NAME \
-    --url-map=$URL_MAP_NAME
-echo "Target HTTP proxy created."
-echo ""
+    # Configure auth plugin
+    if ! grep -q 'USE_GKE_GCLOUD_AUTH_PLUGIN=True' ~/.bashrc; then
+        echo 'export USE_GKE_GCLOUD_AUTH_PLUGIN=True' >> ~/.bashrc
+        source ~/.bashrc
+    fi
 
-# 11. Reserve a Static External IP Address (Global)
-# Provides a stable IP address for the load balancer frontend
-echo "Reserving global static IP address ($STATIC_IP_NAME)..."
-# Error handling in case the address already exists
-gcloud compute addresses create $STATIC_IP_NAME \
-    --ip-version=IPV4 \
-    --global || echo "Static IP address $STATIC_IP_NAME may already exist. Attempting to retrieve it."
+    # Get cluster credentials
+    gcloud container clusters get-credentials $CLUSTER_NAME \
+        --zone=$ZONE \
+        --internal-ip
 
-# Retrieve the IP address regardless of whether creation succeeded or failed
-LOAD_BALANCER_IP=$(gcloud compute addresses describe $STATIC_IP_NAME --global --format='value(address)')
-echo "Static IP address $LOAD_BALANCER_IP reserved/retrieved."
-echo ""
+    # Deploy test application
+    kubectl create deployment hello-server \
+        --image=gcr.io/google-samples/hello-app:1.0
 
-# 12. Create the Global Forwarding Rule
-# Connects the public IP address and port to the target proxy
-echo "Creating global forwarding rule ($FORWARDING_RULE_NAME) using IP $LOAD_BALANCER_IP..."
-# Error handling in case the forwarding rule already exists
-gcloud compute forwarding-rules create $FORWARDING_RULE_NAME \
-    --address=$LOAD_BALANCER_IP \
-    --global \
-    --target-http-proxy=$TARGET_PROXY_NAME \
-    --ports=80 || echo "Forwarding rule $FORWARDING_RULE_NAME may already exist."
-echo "Global forwarding rule created/verified."
-echo ""
+    # Create service
+    kubectl expose deployment hello-server \
+        --type=LoadBalancer \
+        --port=8080
+"
+```
 
-echo "--- Nucleus HTTP Load Balancer Setup Complete (Regional MIG/Template in $REGION) ---"
-echo "Load Balancer IP Address: $LOAD_BALANCER_IP"
-echo "It might take a few minutes for the setup to become fully operational and pass health checks."
-echo "Instances in the Regional MIG will be provisioned in $REGION."
-echo "You can check the status in the Google Cloud Console under Load Balancing and Instance Groups."
-echo "Access the site via http://$LOAD_BALANCER_IP"
+## Verification Steps
+1. Verify the custom role was created:
+```bash
+gcloud iam roles describe $CUSTOM_ROLE_NAME --project=$PROJECT_ID
+```
 
-# Clean up the local startup script file
-rm startup.sh
+2. Verify the service account exists:
+```bash
+gcloud iam service-accounts describe $SERVICE_ACCOUNT_NAME@$PROJECT_ID.iam.gserviceaccount.com
+```
+
+3. Verify the cluster is running:
+```bash
+gcloud container clusters describe $CLUSTER_NAME --zone=$ZONE
+```
+
+4. Verify the application deployment:
+```bash
+kubectl get deployment hello-server
+kubectl get service hello-server
+```
+
+## Important Notes
+- All resources should have the "orca-" prefix
+- The cluster must be private with both private nodes and private endpoint
+- Master authorized networks should only include the jumphost's internal IP
+- The service account should have the minimum required permissions
+- Use internal IP when getting cluster credentials
+- The subnet must have secondary ranges for services and pods
+- The cluster must use beta features for advanced networking
+
+## Troubleshooting
+If you encounter issues:
+1. Check that all required APIs are enabled
+2. Verify your IAM permissions
+3. Ensure the jumphost exists and is accessible
+4. Check that the subnet exists and is properly configured
+5. Verify the service account has all required roles
+6. Ensure you're using the beta version of the container clusters command
+7. Verify the secondary ranges are properly configured in the subnet

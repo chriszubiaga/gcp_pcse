@@ -6,4 +6,6 @@
     - [Service Accounts and Roles: Fundamentals](cloud_security_fundamentals/service_accounts_and_roles.md)
     - [VPC Network Peering](cloud_security_fundamentals/vpc_network_peering.md)
     - [Identity-Aware Proxy (IAP)](cloud_security_fundamentals/identity_aware_proxy.md)
+    - [Cloud Key Management Service (KMS)](cloud_security_fundamentals/cloud_kms.md)
+    - [Private Kubernetes Cluster](cloud_security_fundamentals/private_kubernetes_cluster.md)
 
