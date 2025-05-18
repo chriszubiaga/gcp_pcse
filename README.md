@@ -1,11 +1,15 @@
 # GCP - Professional Cloud Security Engineer
 
 - [Implement Load Balancing on Compute Engine](load_balancer/load_balancing.md)
-- [Implement Cloud Security Fundamentals on Google Cloud](cloud_security_fundamentals/notes.md)
+- [Implement Cloud Security Fundamentals on Google Cloud](cloud_security_fundamentals)
     - [IAM Custom Roles](cloud_security_fundamentals/iam_custom_roles.md)
     - [Service Accounts and Roles: Fundamentals](cloud_security_fundamentals/service_accounts_and_roles.md)
     - [VPC Network Peering](cloud_security_fundamentals/vpc_network_peering.md)
     - [Identity-Aware Proxy (IAP)](cloud_security_fundamentals/identity_aware_proxy.md)
     - [Cloud Key Management Service (KMS)](cloud_security_fundamentals/cloud_kms.md)
     - [Private Kubernetes Cluster](cloud_security_fundamentals/private_kubernetes_cluster.md)
-
+- [Build a Secure Google Cloud Network](build_secure_google_cloud_network)
+    - [Mulitple VPC Networks](build_secure_google_cloud_network/multiple_vpc_networks.md)
+    - [Controlling Access on VPC Networks](build_secure_google_cloud_network/controlling_access_on_vpc.md)
+    - [Application Load Balancer with Cloud Armor](build_secure_google_cloud_network/cloud_armor_app_load_balancermd)
+    - [Internal Load Balancer](build_secure_google_cloud_network/internal_load_balancer.md)

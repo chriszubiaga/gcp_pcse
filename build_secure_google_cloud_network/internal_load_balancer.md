@@ -6,7 +6,7 @@
 
 This lab walks through creating two managed instance groups in the same region and then configuring an Internal Load Balancer to distribute traffic to these instance groups as backends.
 
-![Diagram](.\assets\internal_load_balancer.png
+![Diagram](assets\internal_load_balancer.png
 )
 
 ## Objectives

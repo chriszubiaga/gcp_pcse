@@ -8,7 +8,7 @@ Application Load Balancer with Cloud Armor
 This lab demonstrates configuring an Application Load Balancer with global backends, stress-testing it, and then securing it by denylisting an IP address using Cloud Armor.
 
 
-![Diagram](.\assets\cloud_armor.png)
+![Diagram](assets\cloud_armor.png)
 
 ## Objectives
 

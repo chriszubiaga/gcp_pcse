@@ -7,7 +7,7 @@ This lab focuses on understanding and configuring Virtual Private Cloud (VPC) ne
 
 **Network Diagram Components:**
 
-![Diagram](.\assets\vpc_network.png)
+![Diagram](assets\vpc_network.png)
 
 * **mynetwork (pre-created):** An auto mode network with two VM instances (`mynet-vm-1`, `mynet-vm-2`) and firewall rules.
 * **managementnet (to be created):** A custom mode network with `managementsubnet-1` and `managementnet-vm-1`.
