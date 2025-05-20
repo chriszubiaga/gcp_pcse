@@ -39,6 +39,36 @@ The instance template will define the configuration for the VMs that will run yo
 
 * **gcloud CLI (Conceptual - Startup script makes direct `gcloud instance-templates create` complex):**
     Creating an instance template with a large, dynamic startup script is usually done by saving the script to a file and referencing it, or pasting it in the console.
+    
+    Startup Script:
+    ```bash
+    # Copyright 2021 Google LLC
+    #
+    # Licensed under the Apache License, Version 2.0 (the "License");
+    # you may not use this file except in compliance with the License.# You may obtain a copy of the License at
+    #
+    # http://www.apache.org/licenses/LICENSE-2.0
+    #
+    # Unless required by applicable law or agreed to in writing, software
+    # distributed under the License is distributed on an "AS IS" BASIS,
+    # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+    # See the License for the specific language governing permissions and
+    # limitations under the License.
+
+    apt-get -y update
+    apt-get -y install git
+    apt-get -y install virtualenv
+    git clone --depth 1 https://github.com/GoogleCloudPlatform/python-docs-samples
+    cd python-docs-samples/iap
+    virtualenv venv -p python3
+    source venv/bin/activate
+    pip install -r requirements.txt
+    cat example_gce_backend.py |
+    sed -e "s/YOUR_BACKEND_SERVICE_ID/$(gcloud compute backend-services describe my-backend-service --global--format="value(id)")/g" |
+        sed -e "s/YOUR_PROJECT_ID/$(gcloud config get-value project | tr -cd "[0-9]")/g" > real_backend.py
+    gunicorn real_backend:app -b 0.0.0.0:80
+    ```
+
     ```bash
     # 1. Save the provided startup script to a local file, e.g., startup-script.sh
     #    Ensure the script has execute permissions if needed: chmod +x startup-script.sh
@@ -250,7 +280,7 @@ Secure the application by enabling IAP on the load balancer's backend service.
     * The firewall rule mentioned in the lab `allow-iap-traffic` with source ranges `130.211.0.0/22` and `35.191.0.0/16` (health check ranges) allowing `tcp:80, tcp:78` is for allowing the Load Balancer (acting as proxy) and health checkers to reach the backends.
     * **gcloud CLI (for allowing LB/HC to backends):**
         ```bash
-        gcloud compute firewall-rules create allow-lb-and-health-checks \
+        gcloud compute firewall-rules create allow-iap-traffic \
             --network=default \
             --action=ALLOW \
             --direction=INGRESS \
@@ -260,6 +290,7 @@ Secure the application by enabling IAP on the load balancer's backend service.
         ```
 
 **2. Enable IAP API (if not already done)**
+        
     ```bash
     gcloud services enable iap.googleapis.com
     ```
