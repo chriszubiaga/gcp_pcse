@@ -81,7 +81,7 @@ This task demonstrates how to use the `projects.content.inspect` REST method of 
     curl -s \
       -H "Authorization: Bearer ACCESS_TOKEN" \
       -H "Content-Type: application/json" \
-      [https://dlp.googleapis.com/v2/projects/$PROJECT_ID/content:inspect](https://dlp.googleapis.com/v2/projects/$PROJECT_ID/content:inspect) \
+      https://dlp.googleapis.com/v2/projects/$PROJECT_ID/content:inspect \
       -d @inspect-request.json -o inspect-output.txt
     ```
     * **`-H "Authorization: Bearer ACCESS_TOKEN"`**: Passes the access token for authentication.
@@ -177,7 +177,7 @@ This task demonstrates how the DLP API can automatically de-identify (redact) se
     curl -s \
       -H "Authorization: Bearer $(gcloud auth print-access-token)" \
       -H "Content-Type: application/json" \
-      [https://dlp.googleapis.com/v2/projects/$PROJECT_ID/content:deidentify](https://dlp.googleapis.com/v2/projects/$PROJECT_ID/content:deidentify) \
+      https://dlp.googleapis.com/v2/projects/$PROJECT_ID/content:deidentify \
       -d @new-inspect-file.json -o redact-output.txt
     ```
     * **`https://dlp.googleapis.com/v2/projects/$PROJECT_ID/content:deidentify`**: The DLP API endpoint for de-identifying content.

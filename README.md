@@ -17,3 +17,7 @@
     - [Identity Aware Proxy (IAP)](chrome_enterprise_premium_security/iap.md)
     - [Securing Virtual Machines using Identity Aware Proxy (IAP)](chrome_enterprise_premium_security/iap_secure_vm.md)
     - [Securing Compute Engines using Identity Aware Proxy (IAP)](chrome_enterprise_premium_security/iap_secure_compute_engines.md)
+- [Sensitive Data Protection](sensitive_data_protection)
+    - [Dedentification](sensitive_data_protection/deidentification.md)
+    - [Cloud DLP API](sensitive_data_protection/cloud_dlp_api.md)
+    - [Redacting Critical Data](sensitive_data_protection/redacting_critical_data.md)
